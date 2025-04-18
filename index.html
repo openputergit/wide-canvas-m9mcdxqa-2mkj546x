@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Form Builder & Excel Generator</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-3xl font-bold text-center mb-8">Dynamic Form Builder</h1>
+
+        <!-- Form Builder Section -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Add New Question</h2>
+            <div class="flex gap-4 mb-4">
+                <input type="text" id="questionInput" placeholder="Enter your question" class="flex-1 p-2 border rounded">
+                <select id="questionType" class="p-2 border rounded">
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="date">Date</option>
+                    <option value="radio">Radio</option>
+                    <option value="checkbox">Checkbox</option>
+                </select>
+                <button onclick="addQuestion()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Add Question
+                </button>
+            </div>
+            <div id="optionsContainer" class="hidden mb-4">
+                <input type="text" id="optionsInput" placeholder="Enter options (comma separated)" class="w-full p-2 border rounded">
+            </div>
+        </div>
+
+        <!-- Preview Form -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Form Preview</h2>
+            <form id="previewForm" class="space-y-4">
+                <!-- Questions will be added here -->
+            </form>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-4 justify-center">
+            <button onclick="submitForm()" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">
+                Submit Form
+            </button>
+            <button onclick="exportToExcel()" class="bg-purple-500 text-white px-6 py-2 rounded hover:bg-purple-600">
+                Export to Excel
+            </button>
+            <button onclick="clearForm()" class="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600">
+                Clear Form
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let questions = [];
+        let responses = [];
+
+        // Show/hide options input based on question type
+        document.getElementById('questionType').addEventListener('change', function(e) {
+            const optionsContainer = document.getElementById('optionsContainer');
+            if (e.target.value === 'radio' || e.target.value === 'checkbox') {
+                optionsContainer.classList.remove('hidden');
+            } else {
+                optionsContainer.classList.add('hidden');
+            }
+        });
+
+        function addQuestion() {
+            const questionText = document.getElementById('questionInput').value;
+            const questionType = document.getElementById('questionType').value;
+            const optionsInput = document.getElementById('optionsInput').value;
+
+            if (!questionText) {
+                alert('Please enter a question!');
+                return;
+            }
+
+            let options = [];
+            if (questionType === 'radio' || questionType === 'checkbox') {
+                options = optionsInput.split(',').map(opt => opt.trim());
+                if (!optionsInput || options.length < 2) {
+                    alert('Please enter at least 2 options separated by commas!');
+                    return;
+                }
+            }
+
+            const question = {
+                id: Date.now(),
+                text: questionText,
+                type: questionType,
+                options: options
+            };
+
+            questions.push(question);
+            renderForm();
+            clearInputs();
+        }
+
+        function renderForm() {
+            const form = document.getElementById('previewForm');
+            form.innerHTML = '';
+
+            questions.forEach((question, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-4 border rounded bg-gray-50';
+
+                const questionHeader = document.createElement('div');
+                questionHeader.className = 'flex justify-between items-center mb-2';
+                
+                const questionLabel = document.createElement('label');
+                questionLabel.className = 'font-medium';
+                questionLabel.textContent = `${index + 1}. ${question.text}`;
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<i class="bi bi-trash text-red-500"></i>';
+                deleteBtn.onclick = () => deleteQuestion(index);
+                deleteBtn.className = 'p-1 hover:bg-red-100 rounded';
+
+                questionHeader.appendChild(questionLabel);
+                questionHeader.appendChild(deleteBtn);
+                div.appendChild(questionHeader);
+
+                if (question.type === 'radio' || question.type === 'checkbox') {
+                    question.options.forEach(option => {
+                        const optionDiv = document.createElement('div');
+                        optionDiv.className = 'flex items-center gap-2 mt-2';
+                        
+                        const input = document.createElement('input');
+                        input.type = question.type;
+                        input.name = `question_${question.id}`;
+                        input.value = option;
+                        input.className = 'form-${question.type}';
+                        
+                        const label = document.createElement('label');
+                        label.textContent = option;
+                        
+                        optionDiv.appendChild(input);
+                        optionDiv.appendChild(label);
+                        div.appendChild(optionDiv);
+                    });
+                } else {
+                    const input = document.createElement('input');
+                    input.type = question.type;
+                    input.name = `question_${question.id}`;
+                    input.className = 'w-full p-2 border rounded mt-2';
+                    div.appendChild(input);
+                }
+
+                form.appendChild(div);
+            });
+        }
+
+        function deleteQuestion(index) {
+            questions.splice(index, 1);
+            renderForm();
+        }
+
+        function clearInputs() {
+            document.getElementById('questionInput').value = '';
+            document.getElementById('optionsInput').value = '';
+            document.getElementById('optionsContainer').classList.add('hidden');
+            document.getElementById('questionType').value = 'text';
+        }
+
+        function submitForm() {
+            const formData = new FormData(document.getElementById('previewForm'));
+            const response = {};
+            
+            questions.forEach(question => {
+                const value = formData.getAll(`question_${question.id}`);
+                response[question.text] = value.length > 1 ? value : value[0];
+            });
+
+            responses.push(response);
+            alert('Form submitted successfully!');
+            document.getElementById('previewForm').reset();
+        }
+
+        function exportToExcel() {
+            if (responses.length === 0) {
+                alert('No data to export!');
+                return;
+            }
+
+            const worksheet = XLSX.utils.json_to_sheet(responses);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Responses');
+            XLSX.writeFile(workbook, 'form_responses.xlsx');
+        }
+
+        function clearForm() {
+            if (confirm('Are you sure you want to clear all questions?')) {
+                questions = [];
+                responses = [];
+                renderForm();
+            }
+        }
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
